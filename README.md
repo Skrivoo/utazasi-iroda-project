@@ -1,0 +1,2 @@
+### A dokumentáció LaTeX-ben készült.
+Ha jetbrains IDEA-t használunk, töltsük le [ezt](https://plugins.jetbrains.com/plugin/9473-texify-idea) a plugint. A használathoz töltsük le a MiKTeX-et [itt](https://miktex.org/download). Állítsuk be az SDK-t, a default elérési útvonal windowon `C:\Users\Username\AppData\Local\Programs\MiKTeX`. Ezek után a `main.tex`-ből már compile-olható a pdf.
