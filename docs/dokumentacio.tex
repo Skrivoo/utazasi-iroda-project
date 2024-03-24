@@ -67,3 +67,21 @@
     VÁROS(\underline{Kód} ,Neve, Ország)\\
     LÉGITÁRSASÁG(\underline{Cég kód}, Név)\\
     JÁRAT(\underline{Járat szám},\underline{Gép száma}, Hova, Honnan, Idő, Gép típusa, Ülőhely száma)
+
+\subsection{Normalizálás (kulcsok meghatározása, alulról felfelé és felülről lefelé történő elemzés)}
+
+\{ SZ.személyi szám \} $\rightarrow$ \{ SZ.név, SZ.születési idő\} \\
+\{ LÉG.cég kód \} $\rightarrow$ \{ LÉG.név\} \\
+\{ JÁR.szám \} $\rightarrow$ \{ JÁR.honnan, JÁR.hova, JÁR.gép típusa, JÁR. gép száma, JÁR.idő, JÁR.ülőhelyek száma, VÁR.kód, VÁR.neve, VÁR.ország \} \\
+\{ JÁR.gép száma \} $\rightarrow$ \{ JÁR.gép típusa, JÁR.ülőhelyek száma \} \\
+\{ SZÁL.azonosító \} $\rightarrow$ \{ SZÁL.neve, SZÁL.cím, SZÁL.ár, VÁR.neve, VÁR.ország \} \\
+\{ VÁR.kód \} $\rightarrow$ \{ VÁR.neve, VÁR.ország \} \\
+\{ BIZT.azonosító \} $\rightarrow$ \{ BIZT.biztosítás értéke, BIZT.biztosítás típusa, BIZT.lejárata \} \\
+BIZTOSÍTÁS(\underline{Biztosítás azonosító},Típus, Lejárat, Értéke)\\
+SZEMÉLY(\underline{Személyi szám}, Név, Szül. év)\\
+SZÁLLÁS(\underline{Szállás azonosító}, Neve, Ár (fő/éj), Cím)\\
+VÁROS(\underline{Kód} ,Neve, Ország)\\
+LÉGITÁRSASÁG(\underline{Cég kód}, Név)\\
+JÁRAT(\underline{Járat szám}, Hova, Honnan, Idő)\\
+GÉP(\underline{Gép száma}, Gép típusa, Ülőhelyek száma)\\
+UTAZÁS(\underline{Személyi szám}, \underline{Járat szám}, Ülés szám)
