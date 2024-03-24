@@ -160,3 +160,9 @@ cython_debug/
 .idea/
 out
 auxil
+*.gz
+*.aux
+*.fdb_latexmk
+*.fls
+*.pdf
+*.toc
