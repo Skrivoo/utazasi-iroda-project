@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="hu">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+    <title>Utazasi iroda project</title>
+  </head>
+    <body></br></br></br></br></br>
+        <div align="center">
+          <div align="center" class="border">
+             <div class="header">
+                <h1 class="word">Regisztráció</h1>
+             </div></br></br></br>
+            <h2 class="word">
+                <form action="{{ url_for('registration') }}" method="post">
+                  <div class="msg">{{ msg }}</div>
+                    <input id="name" name="name" type="text" placeholder="Név" class="textbox"/></br></br>
+                    <input id="email" name="email" type="text" placeholder="E-mail cím" class="textbox"/></br></br>
+                    <input id="password" name="password" type="password" placeholder="Jelszó" class="textbox"/></br></br>
+                    <input id="password-again" name="password-again" type="password" placeholder="Jelszó újra" class="textbox"/></br></br>
+                    <input id="id-number" name="id-number" type="text" placeholder="Személyi azonosító" class="textbox"/></br></br>
+                    <input id="birthdate" name="birthdate" type="date" placeholder="Születési dátum" class="textbox"/></br></br>
+                    <input type="submit" class="btn" value="Regisztrálok"></br>
+                </form>
+            </h2>
+            <p class="bottom">Van már felhasználód?  <a class="bottom" href="{{url_for('login')}}"> Jelentkezz be itt </a></p>
+          </div>
+        </div>
+    </body>
+</html>
