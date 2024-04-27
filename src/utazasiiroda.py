@@ -12,8 +12,13 @@ app.secret_key = 'nagyon titkos kod'
 bcrypt = Bcrypt(app)
 
 @app.route('/')
+@app.route('/home')
 def index():
-    return render_template('index.html', connection=con.instance_name)
+    if 'loggedin' in session:
+        msg = 'Be vagy jelentkezve'
+    else:
+        msg = 'Udvozlunk a repulogep szolgaltatonknal'
+    return render_template('index.html', connection=con.instance_name, msg=msg)
 
 @app.route('/registration', methods =['GET', 'POST'])
 def registration():
@@ -70,6 +75,15 @@ def login():
 def logout():
     session.pop('loggedin', None)
     session.pop('email', None)
-    return redirect(url_for('login'))
+    return redirect(url_for('index'))
+
+@app.route('/insurance')
+def insurance():
+    #TODO finish the logic
+    cur = con.cursor()
+    cur.execute("SELECT * FROM BIZTOSITAS")
+    insurance_list = cur.fetchall()
+    cur.close()
+    return render_template('insurance.html', insurance=insurance_list)
 
 app.run(host='0.0.0.0', port=5000)
