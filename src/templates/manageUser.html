@@ -6,7 +6,7 @@
       <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
       <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
       <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
-      <title>Utazasi iroda project</title>
+      <title>Userek törlése</title>
   </head>
   <body>
   <nav class="navbar navbar-default">
@@ -18,8 +18,8 @@
       <li><a href="/">Fooldal</a></li>
       <li><a href="/login">Bejelentkezes</a></li>
       <li><a href="/logout">Kijelentkezes</a></li>
-      <li class="active"><a href="/registration">Regisztracio</a></li>
-      <li><a href="/manegeUser">Felhasználók kezelése</a></li>
+      <li><a href="/registration">Regisztracio</a></li>
+      <li class="active"><a href="/manegeUser">Felhasználók kezelése</a></li>
       <li><a href="/insurance">Biztositas</a></li>
     </ul>
   </div>
@@ -30,18 +30,15 @@
                 <h1 class="word">Regisztráció</h1>
              </div></br></br></br>
             <h2 class="word">
-                <form action="{{ url_for('registration') }}" method="post">
+                <form action="{{ url_for('delete_user') }}" method="post">
                   <div class="msg">{{ msg }}</div>
                     <input id="name" name="name" type="text" placeholder="Név" class="textbox"/></br></br>
                     <input id="email" name="email" type="text" placeholder="E-mail cím" class="textbox"/></br></br>
-                    <input id="password" name="password" type="password" placeholder="Jelszó" class="textbox"/></br></br>
-                    <input id="password-again" name="password-again" type="password" placeholder="Jelszó újra" class="textbox"/></br></br>
                     <input id="id-number" name="id-number" type="text" placeholder="Személyi azonosító" class="textbox"/></br></br>
-                    <input id="birthdate" name="birthdate" type="date" placeholder="Születési dátum" class="textbox"/></br></br>
-                    <input type="submit" class="btn" value="Regisztrálok"></br>
+                    <input type="change" class="btn" value="Megváltoztatom">
+                    <input type="delete" class="btn" value="Törlöm"></br>
                 </form>
             </h2>
-            <p class="bottom">Van már felhasználód?  <a class="bottom" href="{{url_for('login')}}"> Jelentkezz be itt </a></p>
           </div>
         </div>
     </body>
