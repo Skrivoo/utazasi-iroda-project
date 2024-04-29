@@ -11,43 +11,6 @@ app = Flask(__name__)
 app.secret_key = 'nagyon titkos kod'
 bcrypt = Bcrypt(app)
 
-admin = False
-
-
-def select(what, where, filter_param=None, filter_param_filter=None):
-    cur = con.cursor()
-    if filter_param is None:
-        data = [what, where]
-        cur.execute("SELECT :1 FROM :2", data)
-    else:
-        data = [what, where, filter_param, filter_param_filter]
-        cur.execute("SELECT :1 FROM :2 WHERE :3 = :4", data)
-    eredmeny = cur.fetchall()
-    cur.close()
-    return eredmeny
-
-
-def insert(where, which_line, what):
-    cur = con.cursor()
-    sql = "INSERT INTO :table_name VALUES (:which_line) (:what)"
-    cur.execute(sql, table_name=where, which_line=which_line, what=what)
-    con.commit()
-
-
-def delete(where, what, column_name):
-    cur = con.cursor()
-    sql = "DELETE FROM :table_name WHERE :comlumn_name = :what"
-    cur.execute(sql, table_name=where, comlumn_name=column_name, what=what)
-    con.commit()
-
-
-def update(where, what, column_name):
-    cur = con.cursor()
-    sql = "UPDATE :table_name SET :what where = :column_name"
-    cur.execute(sql, table_name=where, column_name=column_name, what=what)
-    con.commit()
-
-
 @app.route('/')
 @app.route('/home')
 def index():
@@ -74,18 +37,15 @@ def registration():
         password_again = request.form['password-again']
         id_number = request.form['id-number']
         birthdate = request.form['birthdate']
-        is_admin = 0
         if password != password_again:
             msg = 'A ket jelszo nem egyezik meg!'
         else:
             hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
             try:
-                insert("SZEMELY", ":1, :2, TO_DATE(:3, 'YYYY-MM-DD'), :4, :5, :6", f"{id_number},\
-                {name}, {birthdate}, {email}, {hashed_password}, {is_admin}")
-                # cur = con.cursor()
-                # cur.execute("INSERT INTO SZEMELY VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'), :4, :5, :6)",
-                #            (id_number, name, birthdate, email, hashed_password, is_admin))
-                # con.commit()
+                cur = con.cursor()
+                cur.execute("INSERT INTO SZEMELY VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'), :4, :5)",
+                            (id_number, name, birthdate, email, hashed_password))
+                con.commit()
             except Exception as e:
                 print(e)
                 msg = 'A regisztracio sikertelen :('
@@ -97,10 +57,16 @@ def registration():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     msg = ''
-    if request.method == 'POST' and \
+    if 'loggedin' in session:
+        msg = 'Mar be vagy jelentkezve'
+    elif request.method == 'POST' and \
             'password' in request.form and \
             'email' in request.form:
-        hashed_password = select("jelszo", "szemely", "email_cim", request.form['email'])[0]
+        cur = con.cursor()
+        sql = "SELECT PASSWD FROM SZEMELY WHERE EMAIL = :email"
+        cur.execute(sql, email=request.form['email'])
+        hashed_password = cur.fetchone()[0]
+        cur.close()
         is_valid = bcrypt.check_password_hash(hashed_password, request.form['password'])
         if is_valid:
             session['loggedin'] = True
@@ -122,7 +88,10 @@ def logout():
 @app.route('/insurance')
 def insurance():
     # TODO finish the logic
-    insurance_list = select("*", "BIZTOSITAS")
+    cur = con.cursor()
+    cur.execute("SELECT * FROM BIZTOSITAS")
+    insurance_list = cur.fetchall()
+    cur.close()
     return render_template('insurance.html', insurance=insurance_list)
 
 
@@ -143,18 +112,26 @@ def admin():
 
 @app.route('/manage_user', methods=['GET', 'POST'])
 def manage_user():
-    msg = 'Írd be a user adatait akit törölni szeretnél'
+    msg = ''
     if request.method == 'POST' and \
-            'name' in request.form and \
             'email' in request.form and \
-            'id-number' in request.form and\
-            'delete' in request.form and \
-            'change' in request.form:
-        if request.form['delete'] == 'Törlöm':
-            delete("SZEMELY", request.form['name'], "NEV")
-        if request.form['change'] == 'Megváltoztatom':
-            update('SZEMELY', f"{request.form['name']}, {request.form['email']}, {request.form['id-number']}")
-    return render_template('manageUser.html', msg=msg)
+            'action' in request.form:
+        if request.form['action'] == 'Torles':
+            cur = con.cursor()
+            sql = "DELETE FROM SZEMELY WHERE EMAIL = :email"
+            cur.execute(sql, email=request.form['email'])
+            con.commit()
+            msg = 'A felhasznalo sikeresen torolve'
+        if request.form['action'] == 'Frissites':
+            if 'name' not in request.form or 'id-number' not in request.form:
+                msg = 'Az szemelyi azonosito es a nev megadasa is szukseges'
+            else:
+                cur = con.cursor()
+                sql = "UPDATE SZEMELY SET SZEMELYI_SZAM = :id_number, NEV = :name WHERE EMAIL = :email"
+                cur.execute(sql, id_number=request.form['id-number'], name=request.form['name'], email=request.form['email'])
+                con.commit()
+                msg = 'A felhasznalo sikeresen frissitve'
+    return render_template('manage_user.html', msg=msg)
 
 
 app.run(host='0.0.0.0', port=5000)
