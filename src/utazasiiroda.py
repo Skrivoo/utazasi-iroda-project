@@ -14,7 +14,7 @@ bcrypt = Bcrypt(app)
 @app.route('/')
 @app.route('/home')
 def index():
-    if 'loggedin' in session:
+    if is_user_logged_in():
         msg = 'Be vagy jelentkezve'
     else:
         msg = 'Udvozlunk a repulogep szolgaltatonknal'
@@ -57,7 +57,7 @@ def registration():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     msg = ''
-    if 'loggedin' in session:
+    if is_user_logged_in():
         msg = 'Mar be vagy jelentkezve'
     elif request.method == 'POST' and \
             'password' in request.form and \
@@ -85,15 +85,74 @@ def logout():
     return redirect(url_for('index'))
 
 
+@app.route('/plan_trip')
+def plan_trip():
+    cur = con.cursor()
+    cur.execute("SELECT * FROM JARAT")
+    trip_list = cur.fetchall()
+    cur.close()
+    return render_template('plan_trip.html', trip_list=trip_list, is_user_logged_in = is_user_logged_in())
+
+@app.route('/reserve_trip/<id>')
+def reserve_trip(id):
+    msg = ''
+    try:
+        cur = con.cursor()
+        output = cur.var(int)
+        cur.execute("""
+                declare
+                    number_of_seats INTEGER;
+                    reserved_seats INTEGER;
+                begin
+                    SELECT b.ULOHELYEK_SZAMA INTO number_of_seats FROM JARAT a JOIN GEP b ON a.GEP_SZAMA = b.GEP_SZAMA WHERE a.JARAT_SZAM = :in_val;
+                    SELECT COUNT(*) INTO reserved_seats FROM UTAZAS WHERE JARAT_SZAM = :in_val;
+                    IF reserved_seats < number_of_seats THEN
+                        :out_val := reserved_seats + 1;
+                    ELSE
+                        :out_val := -999;
+                    END IF;
+                end;""", in_val=id, out_val=output)
+        if output.getvalue() == -999:
+            msg = 'A foglalas sikertelen, nincs mar szabad hely a gepen'
+        else:
+            cur.execute("""
+                        declare
+                            person_id VARCHAR2(20);
+                        begin
+                            SELECT SZEMELYI_SZAM INTO person_id FROM SZEMELY WHERE EMAIL = :email;
+                            INSERT INTO UTAZAS VALUES (person_id, :flight_id, :seat_number);
+                        end;""", email=session['email'], seat_number=output.getvalue(), flight_id=id)
+            con.commit()
+            msg = f'Sikeres foglalas, a {id} azonositoju jaraton az On ulesszama: {output.getvalue()}'
+    except oracledb.IntegrityError:
+        msg = 'Mar foglalt erre az utra'
+    cur.close()
+    return render_template('index.html', msg=msg)
+
+
 @app.route('/insurance')
 def insurance():
-    # TODO finish the logic
+    #TODO ha benne lesznek az admin funkciok akkor le kell kerni, hogy admin-e a user. A biztositas torles mar mukodik es benne van a tablazatban de csak adminkent akarjuk engedelyezni
+    admin_privilege = False
     cur = con.cursor()
     cur.execute("SELECT * FROM BIZTOSITAS")
     insurance_list = cur.fetchall()
     cur.close()
-    return render_template('insurance.html', insurance=insurance_list)
+    return render_template(
+        'insurance.html',
+        insurance=insurance_list,
+        is_user_logged_in = is_user_logged_in(),
+        admin_privilege = admin_privilege
+    )
 
+@app.route('/insurance/<id>/delete')
+def delete_insurance(id):
+    cur = con.cursor()
+    sql = "DELETE FROM BIZTOSITAS WHERE BIZTOSITAS_AZONOSITO = :id"
+    cur.execute(sql, id=id)
+    con.commit()
+    cur.close()
+    return redirect(url_for('insurance'))
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
@@ -132,6 +191,9 @@ def manage_user():
                 con.commit()
                 msg = 'A felhasznalo sikeresen frissitve'
     return render_template('manage_user.html', msg=msg)
+
+def is_user_logged_in():
+    return True if 'loggedin' in session else False
 
 
 app.run(host='0.0.0.0', port=5000)

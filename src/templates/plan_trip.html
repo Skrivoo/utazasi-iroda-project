@@ -20,28 +20,25 @@
           <li><a href="/logout">Kijelentkezes</a></li>
           <li><a href="/registration">Regisztracio</a></li>
           <li><a href="/manage_user">Felhasználók kezelése</a></li>
-          <li class="active"><a href="/insurance">Biztositas</a></li>
-          <li><a href="/plan_trip">Utazas keresese</a></li>
+          <li><a href="/insurance">Biztositas</a></li>
+          <li class="active"><a href="/plan_trip">Utazas keresese</a></li>
         </ul>
       </div>
   </nav>
   <div style="margin: auto; width: 50%;">
       <table class="table table-bordered table-striped">
           <tr>
-            <th style="text-align:left">Tipus</th>
-            <th style="text-align:left">Lejarat</th>
-            <th style="text-align:left">Erteke</th>
-            {% if admin_privilege == True %}
-                <th style="text-align:left">Torles</th>
-            {% endif %}
+            <th style="text-align:left">Honnan</th>
+            <th style="text-align:left">Hova</th>
+            <th style="text-align:left">Mikor</th>
          </tr>
-          {% for item in insurance %}
+          {% for trip in trip_list %}
             <tr>
-                <td>{{ item[1] }}</td>
-                <td>{{ item[2] }}</td>
-                <td>{{ item[3] }} Ft</td>
-                {% if admin_privilege == True %}
-                    <td> <a class="btn btn-primary" role="button" href="{{url_for('delete_insurance', id=item[0])}}">Torles</a></td>
+                <td>{{ trip[2] }}</td>
+                <td>{{ trip[1] }}</td>
+                <td>{{ trip[3] }}</td>
+                {% if is_user_logged_in %}
+                    <td> <a class="btn btn-primary" role="button" href="{{url_for('reserve_trip', id=trip[0])}}">Utazas foglalasa</a></td>
                 {% endif %}
             </tr>
           {% endfor %}
