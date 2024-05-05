@@ -130,8 +130,22 @@ def reserve_trip(id):
     return render_template('index.html', msg=msg)
 
 
-@app.route('/insurance')
+@app.route('/insurance', methods=['GET', 'POST'])
 def insurance():
+    msg = ''
+    if request.method == 'POST' and \
+            'id' in request.form and \
+            'type' in request.form and \
+            'duedate' in request.form and \
+            'price' in request.form:
+        try:
+            cur = con.cursor()
+            cur.execute("INSERT INTO BIZTOSITAS VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'), :4)",
+                        (request.form['id'], request.form['type'], request.form['duedate'], request.form['price']))
+            con.commit()
+            msg = 'A biztositas sikeresen hozzaadva'
+        except:
+            msg = 'Biztositas felvitele sikertelen'
     #TODO ha benne lesznek az admin funkciok akkor le kell kerni, hogy admin-e a user. A biztositas torles mar mukodik es benne van a tablazatban de csak adminkent akarjuk engedelyezni
     admin_privilege = False
     cur = con.cursor()
@@ -142,7 +156,8 @@ def insurance():
         'insurance.html',
         insurance=insurance_list,
         is_user_logged_in = is_user_logged_in(),
-        admin_privilege = admin_privilege
+        admin_privilege = admin_privilege,
+        msg=msg
     )
 
 @app.route('/insurance/<id>/delete')
@@ -153,6 +168,49 @@ def delete_insurance(id):
     con.commit()
     cur.close()
     return redirect(url_for('insurance'))
+
+
+@app.route('/accommodations', methods=['GET', 'POST'])
+def accommodations():
+    msg = ''
+    if request.method == 'POST' and \
+            'id' in request.form and \
+            'address' in request.form and \
+            'city' in request.form and \
+            'price' in request.form and \
+            'name' in request.form:
+        try:
+            cur = con.cursor()
+            cur.execute("INSERT INTO SZALLAS VALUES (:1, :2, :3, :4, :5)",
+                        (request.form['id'], request.form['name'], request.form['price'], request.form['address'], request.form['city']))
+            con.commit()
+            msg = 'A szallas sikeresen hozzaadva'
+        except:
+            msg = 'Szallas felvitele sikertelen'
+    #TODO ha benne lesznek az admin funkciok akkor le kell kerni, hogy admin-e a user. A szallas torles mar mukodik es benne van a tablazatban de csak adminkent akarjuk engedelyezni
+    admin_privilege = False
+    cur = con.cursor()
+    cur.execute("SELECT * FROM SZALLAS")
+    accommodation_list = cur.fetchall()
+    cur.close()
+    return render_template(
+        'accommodations.html',
+        accommodations=accommodation_list,
+        is_user_logged_in=is_user_logged_in(),
+        admin_privilege=admin_privilege,
+        msg=msg
+    )
+
+
+@app.route('/accommodation/<id>/delete')
+def delete_accommodation(id):
+    cur = con.cursor()
+    sql = "DELETE FROM SZALLAS WHERE AZONOSITO = :id"
+    cur.execute(sql, id=id)
+    con.commit()
+    cur.close()
+    return redirect(url_for('accommodations'))
+
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():

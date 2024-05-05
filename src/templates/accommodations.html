@@ -20,23 +20,24 @@
           <li><a href="/logout">Kijelentkezes</a></li>
           <li><a href="/registration">Regisztracio</a></li>
           <li><a href="/manage_user">Felhasználók kezelése</a></li>
-          <li class="active"><a href="/insurance">Biztositas</a></li>
+          <li><a href="/insurance">Biztositas</a></li>
           <li><a href="/plan_trip">Utazas keresese</a></li>
-          <li><a href="/accommodations">Szallasok</a></li>
+          <li class="active"><a href="/accommodations">Szallasok</a></li>
         </ul>
       </div>
   </nav>
 
   {% if admin_privilege %}
-  <h1 class="word">Biztositas hozzaadasa</h1>
+  <h1 class="word">Szallas hozzaadasa</h1>
   <div class="msg">{{ msg }}</div>
 
-  <form action="{{ url_for('insurance') }}" method="post">
+  <form action="{{ url_for('accommodations') }}" method="post">
       <input id="id" name="id" type="text" placeholder="Egyedi azonosito" class="textbox"/><br />
-      <input id="type" name="type" type="text" placeholder="Tipus" class="textbox"/><br />
-      <input id="duedate" name="duedate" type="date" placeholder="Lejarat" class="textbox"/><br />
+      <input id="name" name="name" type="text" placeholder="Szallas nev" class="textbox"/><br />
+      <input id="address" name="address" type="text" placeholder="Cime" class="textbox"/><br />
       <input id="price" name="price" type="text" placeholder="Ara" class="textbox"/><br />
-      <input type="submit" class="btn" value="Biztositas felvitele a rendszerbe">
+      <input id="city" name="city" type="text" placeholder="Varos kodja" class="textbox"/><br />
+      <input type="submit" class="btn" value="Szallas felvitele a rendszerbe">
       <br />
   </form>
 
@@ -45,20 +46,20 @@
   <div style="margin: auto; width: 50%;">
       <table class="table table-bordered table-striped">
           <tr>
-            <th style="text-align:left">Tipus</th>
-            <th style="text-align:left">Lejarat</th>
-            <th style="text-align:left">Erteke</th>
+            <th style="text-align:left">Nev</th>
+            <th style="text-align:left">Cim</th>
+            <th style="text-align:left">Ara</th>
             {% if admin_privilege == True %}
                 <th style="text-align:left">Torles</th>
             {% endif %}
          </tr>
-          {% for item in insurance %}
+          {% for item in accommodations %}
             <tr>
                 <td>{{ item[1] }}</td>
-                <td>{{ item[2] }}</td>
-                <td>{{ item[3] }} Ft</td>
+                <td>{{ item[3] }}</td>
+                <td>{{ item[2] }} Ft</td>
                 {% if admin_privilege == True %}
-                    <td> <a class="btn btn-primary" role="button" href="{{url_for('delete_insurance', id=item[0])}}">Torles</a></td>
+                    <td> <a class="btn btn-primary" role="button" href="{{url_for('delete_accommodation', id=item[0])}}">Torles</a></td>
                 {% endif %}
             </tr>
           {% endfor %}
