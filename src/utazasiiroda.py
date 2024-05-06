@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request, url_for, session, redirect
 from flask_bcrypt import Bcrypt
 import oracledb
-import sys
 
 connection_string = "localhost:1521/freepdb1"
 con = oracledb.connect(
@@ -19,7 +18,7 @@ def index():
         msg = 'Be vagy jelentkezve'
     else:
         msg = 'Udvozlunk a repulogep szolgaltatonknal'
-    return render_template('index.html', connection=con.instance_name, msg=msg)
+    return render_template('index.html', connection=con.instance_name, msg=msg, active='index')
 
 
 @app.route('/registration', methods=['GET', 'POST'])
@@ -38,21 +37,22 @@ def registration():
         password_again = request.form['password-again']
         id_number = request.form['id-number']
         birthdate = request.form['birthdate']
+        admin = 0
         if password != password_again:
             msg = 'A ket jelszo nem egyezik meg!'
         else:
             hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
             try:
                 cur = con.cursor()
-                cur.execute("INSERT INTO SZEMELY VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'), :4, :5)",
-                            (id_number, name, birthdate, email, hashed_password))
+                cur.execute("INSERT INTO SZEMELY VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'), :4, :5, :6)",
+                            (id_number, name, birthdate, email, hashed_password, admin))
                 con.commit()
             except Exception as e:
                 print(e)
                 msg = 'A regisztracio sikertelen :('
     elif request.method == 'POST':
         msg = 'Tolts ki minden mezot!'
-    return render_template('registration.html', msg=msg)
+    return render_template('registration.html', msg=msg, active='registration')
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -76,46 +76,83 @@ def login():
             return render_template('index.html', msg=msg)
         else:
             msg = 'Sikertelen bejelentkezes, nem megfelelo email vagy jelszo!'
-    return render_template('login.html', msg=msg)
+    return render_template('login.html', msg=msg, active='login')
 
 
 @app.route('/logout')
 def logout():
     session.pop('loggedin', None)
     session.pop('email', None)
+    session.pop('admin', None)
     return redirect(url_for('index'))
 
 
-@app.route('/plan_trip/<mode>')
-def plan_trip(mode):
-    if mode != 'all' and mode != 'mine':
-        mode = 'all'
+@app.route('/plan_trip', methods=['GET', 'POST'])
+def plan_trip():
     cur = con.cursor()
-    if mode == 'all':
-        cur.execute("SELECT * FROM JARAT")
-        trip_list = cur.fetchall()
-    elif mode == 'mine':
-        output_cursor = cur.var(oracledb.DB_TYPE_CURSOR)
-        cur.execute("""
+    if request.method == 'POST':
+        from_filter = request.form['from_filter']
+        to_filter = request.form['to_filter']
+        when_filter = request.form['when_filter']
+        owner_filter = request.form['owner_filter']
+        action = request.form['action']
+        email = session['email']
+        if action == 'Minden jarat':
+            cur.execute("SELECT * FROM JARAT")
+            trip_list = cur.fetchall()
+        elif action == 'Sajat utazasok':
+            output_cursor = cur.var(oracledb.DB_TYPE_CURSOR)
+            cur.execute("""
             DECLARE
                 person_id SZEMELY.Szemelyi_szam%TYPE;
                 trip_cursor SYS_REFCURSOR;
             BEGIN
                 SELECT SZEMELYI_SZAM INTO person_id FROM SZEMELY WHERE EMAIL = :email;
-
                 OPEN trip_cursor FOR
                 SELECT *
                 FROM JARAT
                 JOIN UTAZAS ON JARAT.Jarat_szam = UTAZAS.Jarat_szam
                 WHERE UTAZAS.Szemelyi_szam = person_id;
-
                 :output_cursor := trip_cursor;
-
+            END;""", {'email': session['email'], 'output_cursor': output_cursor})
+            trip_list = output_cursor.getvalue().fetchall()
+        elif action == 'Szures' and owner_filter == 'Minden jarat':
+            cur.execute("""
+            SELECT * FROM JARAT WHERE
+            (:from_filter = 'any' OR Honnan = :from_filter) AND
+            (:to_filter = 'any' OR Hova = :to_filter) AND
+            (:when_filter = 'any' OR Ido = TO_TIMESTAMP(:when_filter, 'YYYY-MM-DD HH24:MI:SS')) 
+            """, from_filter=from_filter, to_filter=to_filter, when_filter=when_filter)
+            trip_list = cur.fetchall()
+        else:
+            output_cursor = cur.var(oracledb.DB_TYPE_CURSOR)
+            cur.execute("""
+            DECLARE
+                person_id SZEMELY.Szemelyi_szam%TYPE;
+                trip_cursor SYS_REFCURSOR;
+            BEGIN
+                SELECT SZEMELYI_SZAM INTO person_id FROM SZEMELY WHERE EMAIL = :email;
+                OPEN trip_cursor FOR 
+                SELECT * FROM JARAT 
+                JOIN UTAZAS ON JARAT.Jarat_szam = UTAZAS.Jarat_szam WHERE
+                (UTAZAS.Szemelyi_szam = person_id) AND
+                (:from_filter = 'any' OR Honnan = :from_filter) AND
+                (:to_filter = 'any' OR Hova = :to_filter) AND
+                (:when_filter = 'any' OR Ido = TO_TIMESTAMP(:when_filter, 'YYYY-MM-DD HH24:MI:SS'));
+                :output_cursor := trip_cursor;
             END;
-        """, {'email': session['email'], 'output_cursor': output_cursor})
-        trip_list = output_cursor.getvalue().fetchall()
+            """, from_filter=from_filter, to_filter=to_filter, when_filter=when_filter, email=email, output_cursor=output_cursor)
+            trip_list = output_cursor.getvalue().fetchall()
+        
+    else:
+        cur.execute("SELECT * FROM JARAT")
+        trip_list = cur.fetchall()
+    cur.execute("SELECT Neve, Kod FROM VAROS")
+    cities = cur.fetchall()    
+    cur.execute("SELECT Ido FROM JARAT GROUP BY Ido")
+    times = cur.fetchall()    
     cur.close()
-    return render_template('plan_trip.html', trip_list=trip_list, is_user_logged_in = is_user_logged_in(), mode = mode)
+    return render_template('plan_trip.html', times=times, cities=cities, trip_list=trip_list, is_user_logged_in = is_user_logged_in(), active='plan_trip')
 
 @app.route('/reserve_trip/<id>')
 def reserve_trip(id):
@@ -151,7 +188,7 @@ def reserve_trip(id):
     except oracledb.IntegrityError:
         msg = 'Mar foglalt erre az utra'
     cur.close()
-    return render_template('index.html', msg=msg)
+    return render_template('index.html', msg=msg, active='index')
 
 
 @app.route('/insurance', methods=['GET', 'POST'])
@@ -171,7 +208,7 @@ def insurance():
         except:
             msg = 'Biztositas felvitele sikertelen'
     #TODO ha benne lesznek az admin funkciok akkor le kell kerni, hogy admin-e a user. A biztositas torles mar mukodik es benne van a tablazatban de csak adminkent akarjuk engedelyezni
-    admin_privilege = False
+    admin_privilege = is_user_admin()
     cur = con.cursor()
     cur.execute("SELECT * FROM BIZTOSITAS")
     insurance_list = cur.fetchall()
@@ -181,7 +218,8 @@ def insurance():
         insurance=insurance_list,
         is_user_logged_in = is_user_logged_in(),
         admin_privilege = admin_privilege,
-        msg=msg
+        msg=msg,
+        active='insurance'
     )
 
 @app.route('/insurance/<id>/delete')
@@ -267,14 +305,15 @@ def accommodations():
     cur.execute("SELECT Neve, Kod FROM VAROS")
     cities = cur.fetchall()        
     cur.close()
-    admin_privilege = False
+    admin_privilege = is_user_admin()
     return render_template(
         'accommodations.html',
         cities=cities,
         accommodations=accommodation_list,
         is_user_logged_in=is_user_logged_in(),
         admin_privilege=admin_privilege,
-        msg=msg
+        msg=msg,
+        active='accommodations'
     )
 
 
@@ -287,20 +326,20 @@ def delete_accommodation(id):
     cur.close()
     return redirect(url_for('accommodations'))
 
-
+# ADMIN BEJELENTKEZÉS: sima bejelentkezés email:admin password:admin, majd /admin megnyitása
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
-    cur = con.cursor()
-    sql = "SELECT admin, email_cim FROM SZEMELY where email_cim = :email"
-    cur.execute(sql, email=request.form['email'])
-    is_admin = cur.fetchone()[0]
-    cur.close()
-    if is_admin == 1:
-        admin_user = "Admin vagy!"
-        return render_template('index.html', is_admin=admin_user)
-    else:
-        admin_user = ""
-        return render_template('index.html', is_admin=admin_user)
+    if is_user_logged_in:
+        cur = con.cursor()
+        sql = "SELECT Is_Admin FROM SZEMELY WHERE Email = :email"
+        cur.execute(sql, email=session['email'])
+        is_admin = False if cur.fetchone()[0] == 0 else True
+        cur.close()
+        if is_admin:
+            admin_user = "Admin vagy!"
+            session['admin'] = True
+            return render_template('admin.html', is_admin=admin_user, active='index')
+    return redirect(url_for('index'))
 
 
 @app.route('/manage_user', methods=['GET', 'POST'])
@@ -324,10 +363,13 @@ def manage_user():
                 cur.execute(sql, id_number=request.form['id-number'], name=request.form['name'], email=request.form['email'])
                 con.commit()
                 msg = 'A felhasznalo sikeresen frissitve'
-    return render_template('manage_user.html', msg=msg)
+    return render_template('manage_user.html', msg=msg, active='manage_user')
 
 def is_user_logged_in():
     return True if 'loggedin' in session else False
+
+def is_user_admin():
+    return True if 'admin' in session else False
 
 
 app.run(host='0.0.0.0', port=5000)

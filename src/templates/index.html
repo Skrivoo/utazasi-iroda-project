@@ -9,24 +9,7 @@
       <title>Utazasi iroda project</title>
   </head>
   <body>
-  <nav class="navbar navbar-default">
-  <div class="container-fluid">
-    <div class="navbar-header">
-      <a class="navbar-brand">Utazasi iroda</a>
-    </div>
-    <ul class="nav navbar-nav">
-      <li class="active"><a href="/">Fooldal</a></li>
-      <li><a href="/login">Bejelentkezes</a></li>
-      <li><a href="/logout">Kijelentkezes</a></li>
-      <li><a href="/registration">Regisztracio</a></li>
-      <li><a href="/manage_user">Felhasználók kezelése</a></li>
-      <li><a href="/insurance">Biztositas</a></li>
-      <li><a href="/plan_trip/all">Utazas keresese</a></li>
-      <li><a href="/accommodations">Szallasok</a></li>
-    </ul>
-  </div>
-</nav>
-
+    {% include 'navigation.html' %}
     <h1>Connected to: {{ connection }}</h1>
 
     <h2>{{ msg }}</h2>
