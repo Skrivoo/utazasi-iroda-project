@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, url_for, session, redirect
 from flask_bcrypt import Bcrypt
 import oracledb
+import sys
 
 connection_string = "localhost:1521/freepdb1"
 con = oracledb.connect(
@@ -85,13 +86,36 @@ def logout():
     return redirect(url_for('index'))
 
 
-@app.route('/plan_trip')
-def plan_trip():
+@app.route('/plan_trip/<mode>')
+def plan_trip(mode):
+    if mode != 'all' and mode != 'mine':
+        mode = 'all'
     cur = con.cursor()
-    cur.execute("SELECT * FROM JARAT")
-    trip_list = cur.fetchall()
+    if mode == 'all':
+        cur.execute("SELECT * FROM JARAT")
+        trip_list = cur.fetchall()
+    elif mode == 'mine':
+        output_cursor = cur.var(oracledb.DB_TYPE_CURSOR)
+        cur.execute("""
+            DECLARE
+                person_id SZEMELY.Szemelyi_szam%TYPE;
+                trip_cursor SYS_REFCURSOR;
+            BEGIN
+                SELECT SZEMELYI_SZAM INTO person_id FROM SZEMELY WHERE EMAIL = :email;
+
+                OPEN trip_cursor FOR
+                SELECT *
+                FROM JARAT
+                JOIN UTAZAS ON JARAT.Jarat_szam = UTAZAS.Jarat_szam
+                WHERE UTAZAS.Szemelyi_szam = person_id;
+
+                :output_cursor := trip_cursor;
+
+            END;
+        """, {'email': session['email'], 'output_cursor': output_cursor})
+        trip_list = output_cursor.getvalue().fetchall()
     cur.close()
-    return render_template('plan_trip.html', trip_list=trip_list, is_user_logged_in = is_user_logged_in())
+    return render_template('plan_trip.html', trip_list=trip_list, is_user_logged_in = is_user_logged_in(), mode = mode)
 
 @app.route('/reserve_trip/<id>')
 def reserve_trip(id):
@@ -173,6 +197,7 @@ def delete_insurance(id):
 @app.route('/accommodations', methods=['GET', 'POST'])
 def accommodations():
     msg = ''
+    accommodation_list = []
     if request.method == 'POST' and \
             'id' in request.form and \
             'address' in request.form and \
@@ -188,13 +213,64 @@ def accommodations():
         except:
             msg = 'Szallas felvitele sikertelen'
     #TODO ha benne lesznek az admin funkciok akkor le kell kerni, hogy admin-e a user. A szallas torles mar mukodik es benne van a tablazatban de csak adminkent akarjuk engedelyezni
-    admin_privilege = False
+    elif request.method == 'POST' and 'city_filter' in request.form:
+        cur = con.cursor()
+        filter = request.form['city_filter']
+        if filter == 'any':
+            cur.execute("SELECT * FROM SZALLAS")
+            accommodation_list = cur.fetchall()
+        elif filter == 'relevant':
+            output_cursor = cur.var(oracledb.DB_TYPE_CURSOR)
+            cur.execute("""
+                DECLARE
+                    person_id SZEMELY.Szemelyi_szam%TYPE;
+                    city_cursor SYS_REFCURSOR;
+                    hotel_cursor SYS_REFCURSOR;
+                BEGIN
+                    SELECT SZEMELYI_SZAM INTO person_id FROM SZEMELY WHERE EMAIL = :email;
+
+                    OPEN city_cursor FOR
+                    SELECT Varos_Kod
+                    FROM JARAT
+                    JOIN UTAZAS ON JARAT.Jarat_szam = UTAZAS.Jarat_szam
+                    WHERE UTAZAS.Szemelyi_szam = person_id
+                    GROUP BY Varos_Kod;
+
+                    OPEN hotel_cursor FOR
+                    WITH cities AS (
+                        SELECT Varos_Kod FROM (
+                            SELECT Varos_Kod
+                            FROM JARAT
+                            JOIN UTAZAS ON JARAT.Jarat_szam = UTAZAS.Jarat_szam
+                            WHERE UTAZAS.Szemelyi_szam = person_id
+                            GROUP BY Varos_Kod
+                        )
+                    )
+                    SELECT * FROM SZALLAS WHERE Varos_Kod IN (SELECT Varos_Kod FROM cities);
+                    :output_cursor := hotel_cursor;
+                END;""", 
+                {'email': session['email'], 'output_cursor': output_cursor})
+            accommodation_list = output_cursor.getvalue().fetchall()
+        else:
+            try:
+                cur.execute("SELECT * FROM SZALLAS WHERE Varos_Kod = :city_code", city_code=filter)
+                accommodation_list = cur.fetchall()
+            except:
+                print("Nem sikerült :(")
+        cur.close()
+    else:
+        cur = con.cursor()
+        cur.execute("SELECT * FROM SZALLAS")
+        accommodation_list = cur.fetchall()
+        cur.close()
     cur = con.cursor()
-    cur.execute("SELECT * FROM SZALLAS")
-    accommodation_list = cur.fetchall()
+    cur.execute("SELECT Neve, Kod FROM VAROS")
+    cities = cur.fetchall()        
     cur.close()
+    admin_privilege = False
     return render_template(
         'accommodations.html',
+        cities=cities,
         accommodations=accommodation_list,
         is_user_logged_in=is_user_logged_in(),
         admin_privilege=admin_privilege,

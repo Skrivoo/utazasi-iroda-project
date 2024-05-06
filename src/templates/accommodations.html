@@ -21,7 +21,7 @@
           <li><a href="/registration">Regisztracio</a></li>
           <li><a href="/manage_user">Felhasználók kezelése</a></li>
           <li><a href="/insurance">Biztositas</a></li>
-          <li><a href="/plan_trip">Utazas keresese</a></li>
+          <li><a href="/plan_trip/all">Utazas keresese</a></li>
           <li class="active"><a href="/accommodations">Szallasok</a></li>
         </ul>
       </div>
@@ -44,6 +44,16 @@
   {% endif %}
 
   <div style="margin: auto; width: 50%;">
+      <form action="{{ url_for('accommodations') }}" method="post">
+        <select name="city_filter" id="city_filter">
+          <option value="any">Minden</option>
+          <option value="relevant">Utazásaimhoz</option>
+          {% for item in cities%}
+          <option value="{{ item[1] }}">{{ item[0] }}</option>
+          {% endfor %}
+        </select>
+        <input type="submit" class="btn" value="Szures">
+      </form>
       <table class="table table-bordered table-striped">
           <tr>
             <th style="text-align:left">Nev</th>
