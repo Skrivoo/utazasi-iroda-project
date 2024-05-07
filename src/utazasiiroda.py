@@ -115,7 +115,7 @@ def plan_trip():
                     JOIN UTAZAS ON JARAT.Jarat_szam = UTAZAS.Jarat_szam
                     WHERE UTAZAS.Szemelyi_szam = person_id;
                     :output_cursor := trip_cursor;
-                END;""", {'email': session['email'], 'output_cursor': output_cursor})
+                END;""", email=session['email'], output_cursor=output_cursor)
                 trip_list = output_cursor.getvalue().fetchall()
             elif action == 'Szures' and owner_filter == 'any':
                 cur.execute("""
@@ -216,6 +216,7 @@ def reserve_trip(id):
 
 @app.route('/insurance', methods=['GET', 'POST'])
 def insurance():
+    insurance_list = []
     msg = ''
     if request.method == 'POST' and \
             'id' in request.form and \
@@ -230,14 +231,57 @@ def insurance():
             msg = 'A biztositas sikeresen hozzaadva'
         except:
             msg = 'Biztositas felvitele sikertelen'
-    #TODO ha benne lesznek az admin funkciok akkor le kell kerni, hogy admin-e a user. A biztositas torles mar mukodik es benne van a tablazatban de csak adminkent akarjuk engedelyezni
+    elif request.method == 'POST' and 'type_filter' in request.form:
+        type_filter = request.form['type_filter']
+        time_from = request.form['time_from']
+        time_to = request.form['time_to']
+        value_from = request.form['value_from']
+        value_to = request.form['value_to']
+        action = request.form['action']
+        cur = con.cursor()
+        if action == 'Osszes':
+            cur.execute("SELECT * FROM BIZTOSITAS")
+            insurance_list = cur.fetchall()
+        elif type_filter == 'any':
+            cur.execute("""
+                        SELECT * FROM BIZTOSITAS 
+                        WHERE TO_DATE(:time_from, 'YYYY-MM-DD') <= Lejarat AND 
+                        Lejarat <= TO_DATE(:time_to, 'YYYY-MM-DD') AND
+                        :value_from <= Erteke AND Erteke <= :value_to""",
+                        time_from=time_from,
+                        time_to=time_to,
+                        value_from=value_from,
+                        value_to=value_to)
+            insurance_list = cur.fetchall()
+        else:
+            cur.execute("""
+                        SELECT * FROM BIZTOSITAS 
+                        WHERE Tipus = :type_filter AND
+                        TO_DATE(:time_from, 'YYYY-MM-DD') <= Lejarat AND 
+                        Lejarat <= TO_DATE(:time_to, 'YYYY-MM-DD') AND
+                        :value_from <= Erteke AND Erteke <= :value_to""",
+                        type_filter=type_filter,
+                        time_from=time_from,
+                        time_to=time_to,
+                        value_from=value_from,
+                        value_to=value_to)
+            insurance_list = cur.fetchall()
+        
+        cur.close()
+    else:
+        cur = con.cursor()
+        cur.execute("SELECT * FROM BIZTOSITAS")
+        insurance_list = cur.fetchall()
+        cur.close()
+
     admin_privilege = is_user_admin()
     cur = con.cursor()
-    cur.execute("SELECT * FROM BIZTOSITAS")
-    insurance_list = cur.fetchall()
+    cur.execute("SELECT Tipus FROM BIZTOSITAS GROUP BY Tipus")
+    type_list = cur.fetchall()
     cur.close()
     return render_template(
         'insurance.html',
+        types=type_list,
         insurance=insurance_list,
         is_user_logged_in = is_user_logged_in(),
         admin_privilege = admin_privilege,
@@ -273,29 +317,31 @@ def accommodations():
             msg = 'A szallas sikeresen hozzaadva'
         except:
             msg = 'Szallas felvitele sikertelen'
-    #TODO ha benne lesznek az admin funkciok akkor le kell kerni, hogy admin-e a user. A szallas torles mar mukodik es benne van a tablazatban de csak adminkent akarjuk engedelyezni
     elif request.method == 'POST' and 'city_filter' in request.form:
+        city_filter = request.form['city_filter']
+        cost_from = request.form['cost_from']
+        cost_to = request.form['cost_to']
+        try:
+            cost_from = int(cost_from)
+            cost_to = int(cost_to)
+            if cost_from > cost_to:
+                raise Exception
+        except:
+            return redirect(url_for('accommodations'))
+        action = request.form['action']
         cur = con.cursor()
         filter = request.form['city_filter']
-        if filter == 'any':
+        if action == 'Osszes':
             cur.execute("SELECT * FROM SZALLAS")
             accommodation_list = cur.fetchall()
-        elif filter == 'relevant':
+        elif action == 'Sajat utazasokhoz':
             output_cursor = cur.var(oracledb.DB_TYPE_CURSOR)
             cur.execute("""
                 DECLARE
                     person_id SZEMELY.Szemelyi_szam%TYPE;
-                    city_cursor SYS_REFCURSOR;
                     hotel_cursor SYS_REFCURSOR;
                 BEGIN
                     SELECT SZEMELYI_SZAM INTO person_id FROM SZEMELY WHERE EMAIL = :email;
-
-                    OPEN city_cursor FOR
-                    SELECT Varos_Kod
-                    FROM JARAT
-                    JOIN UTAZAS ON JARAT.Jarat_szam = UTAZAS.Jarat_szam
-                    WHERE UTAZAS.Szemelyi_szam = person_id
-                    GROUP BY Varos_Kod;
 
                     OPEN hotel_cursor FOR
                     WITH cities AS (
@@ -310,14 +356,55 @@ def accommodations():
                     SELECT * FROM SZALLAS WHERE Varos_Kod IN (SELECT Varos_Kod FROM cities);
                     :output_cursor := hotel_cursor;
                 END;""", 
-                {'email': session['email'], 'output_cursor': output_cursor})
+                email=session['email'], output_cursor=output_cursor)
             accommodation_list = output_cursor.getvalue().fetchall()
+        elif city_filter == 'relevant':
+            output_cursor = cur.var(oracledb.DB_TYPE_CURSOR)
+            cur.execute("""
+                DECLARE
+                    person_id SZEMELY.Szemelyi_szam%TYPE;
+                    hotel_cursor SYS_REFCURSOR;
+                BEGIN
+                    SELECT SZEMELYI_SZAM INTO person_id FROM SZEMELY WHERE EMAIL = :email;
+                    
+                    OPEN hotel_cursor FOR
+                    WITH cities AS (
+                        SELECT Varos_Kod
+                        FROM (
+                            SELECT Varos_Kod
+                            FROM JARAT
+                            JOIN UTAZAS ON JARAT.Jarat_szam = UTAZAS.Jarat_szam
+                            WHERE UTAZAS.Szemelyi_szam = person_id
+                            GROUP BY Varos_Kod
+                        )
+                    ),
+                    hotels AS (
+                        SELECT * 
+                        FROM SZALLAS
+                        WHERE Varos_Kod IN (SELECT Varos_Kod FROM cities)
+                    )
+                    SELECT * 
+                    FROM hotels 
+                    WHERE (CAST(:cost_from AS NUMERIC) <= Ar) AND (Ar <= CAST(:cost_to AS NUMERIC));
+                        
+                    :output_cursor := hotel_cursor;
+                END;""", 
+                email=session['email'], 
+                cost_from=str(cost_from), 
+                cost_to=str(cost_to),
+                output_cursor=output_cursor, 
+                )
+            accommodation_list = output_cursor.getvalue().fetchall()
+        elif city_filter == 'any':
+            cur.execute("SELECT * FROM SZALLAS WHERE (:cost_from <= Ar) AND (Ar <= :cost_to)", cost_from=cost_from, cost_to=cost_to)
+            accommodation_list = cur.fetchall()
         else:
             try:
-                cur.execute("SELECT * FROM SZALLAS WHERE Varos_Kod = :city_code", city_code=filter)
+                cur.execute("SELECT * FROM SZALLAS WHERE (Varos_Kod = :city_code) AND  (:cost_from <= Ar) AND (Ar <= :cost_to)", city_code=filter, cost_from=cost_from, cost_to=cost_to)
                 accommodation_list = cur.fetchall()
             except:
-                print("Nem sikerült :(")
+                cur.close()
+                return redirect(url_for(accommodations))
         cur.close()
     else:
         cur = con.cursor()

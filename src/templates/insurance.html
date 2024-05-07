@@ -27,6 +27,27 @@
   {% endif %}
 
   <div style="margin: auto; width: 50%;">
+    <form action="{{ url_for('insurance') }}" method="post">
+      <div class="form-group">
+        <label for="type_filter">Tipus:</label>
+        <select class="form-control" name="type_filter" id="type_filter">
+          <option selected="" value="any">Minden</option>
+          {% for item in types%}
+          <option value="{{ item[0] }}">{{ item[0] }}</option>
+          {% endfor %}
+        </select>
+        <label for="time_from">Lejárattól</label>
+        <input type="date" class="form-control" name="time_from" id="time_from" value="2020-01-01">
+        <label for="time_to">Lejáratig</label>
+        <input type="date" class="form-control" name="time_to" id="time_to" value="2099-12-31">
+        <label for="value_from">Értéktől</label>
+        <input type="number" class="form-control" name="value_from" id="value_from" min="0" value="0">
+        <label for="value_to">Értékig</label>
+        <input type="number" class="form-control" name="value_to" id="value_to" min="0" value="999999">
+        <input type="submit" class="btn btn-primary" name="action" value="Szures">
+        <input type="submit" class="btn btn-primary" name="action" value="Osszes">
+      </div>
+    </form>
       <table class="table table-bordered table-striped">
           <tr>
             <th style="text-align:left">Tipus</th>

@@ -29,16 +29,27 @@
 
   <div style="margin: auto; width: 50%;">
       <form action="{{ url_for('accommodations') }}" method="post">
-        <select name="city_filter" id="city_filter">
-          <option selected="" value="any">Minden</option>
+        <div class="form-group">
+          <label for="city_filter">Város:</label>
+          <select class="form-control" name="city_filter" id="city_filter">
+            <option selected="" value="any">Minden</option>
+            {% if is_user_logged_in %}
+            <option value="relevant">Utazásaimhoz</option>
+            {% endif %}
+            {% for item in cities%}
+            <option value="{{ item[1] }}">{{ item[0] }}</option>
+            {% endfor %}
+          </select>
+          <label for="cost_from">Ártól</label>
+          <input type="number" class="form-control" name="cost_from" id="cost_from" min="0" value="0">
+          <label for="cost_to">Árig</label>
+          <input type="number" class="form-control" name="cost_to" id="cost_to" min="0" value="999999">
+          <input type="submit" class="btn btn-primary" name="action" value="Szures">
           {% if is_user_logged_in %}
-          <option value="relevant">Utazásaimhoz</option>
+          <input type="submit" class="btn btn-primary" name="action" value="Sajat utazasokhoz">
           {% endif %}
-          {% for item in cities%}
-          <option value="{{ item[1] }}">{{ item[0] }}</option>
-          {% endfor %}
-        </select>
-        <input type="submit" class="btn" value="Szures">
+          <input type="submit" class="btn btn-primary" name="action" value="Osszes">
+        </div>
       </form>
       <table class="table table-bordered table-striped">
           <tr>
