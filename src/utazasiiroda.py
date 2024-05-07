@@ -91,59 +91,79 @@ def logout():
 def plan_trip():
     cur = con.cursor()
     if request.method == 'POST':
-        from_filter = request.form['from_filter']
-        to_filter = request.form['to_filter']
-        when_filter = request.form['when_filter']
-        owner_filter = request.form['owner_filter']
-        action = request.form['action']
-        email = session['email']
-        if action == 'Minden jarat':
-            cur.execute("SELECT * FROM JARAT")
-            trip_list = cur.fetchall()
-        elif action == 'Sajat utazasok':
-            output_cursor = cur.var(oracledb.DB_TYPE_CURSOR)
-            cur.execute("""
-            DECLARE
-                person_id SZEMELY.Szemelyi_szam%TYPE;
-                trip_cursor SYS_REFCURSOR;
-            BEGIN
-                SELECT SZEMELYI_SZAM INTO person_id FROM SZEMELY WHERE EMAIL = :email;
-                OPEN trip_cursor FOR
-                SELECT *
-                FROM JARAT
-                JOIN UTAZAS ON JARAT.Jarat_szam = UTAZAS.Jarat_szam
-                WHERE UTAZAS.Szemelyi_szam = person_id;
-                :output_cursor := trip_cursor;
-            END;""", {'email': session['email'], 'output_cursor': output_cursor})
-            trip_list = output_cursor.getvalue().fetchall()
-        elif action == 'Szures' and owner_filter == 'Minden jarat':
-            cur.execute("""
-            SELECT * FROM JARAT WHERE
-            (:from_filter = 'any' OR Honnan = :from_filter) AND
-            (:to_filter = 'any' OR Hova = :to_filter) AND
-            (:when_filter = 'any' OR Ido = TO_TIMESTAMP(:when_filter, 'YYYY-MM-DD HH24:MI:SS')) 
-            """, from_filter=from_filter, to_filter=to_filter, when_filter=when_filter)
-            trip_list = cur.fetchall()
-        else:
-            output_cursor = cur.var(oracledb.DB_TYPE_CURSOR)
-            cur.execute("""
-            DECLARE
-                person_id SZEMELY.Szemelyi_szam%TYPE;
-                trip_cursor SYS_REFCURSOR;
-            BEGIN
-                SELECT SZEMELYI_SZAM INTO person_id FROM SZEMELY WHERE EMAIL = :email;
-                OPEN trip_cursor FOR 
-                SELECT * FROM JARAT 
-                JOIN UTAZAS ON JARAT.Jarat_szam = UTAZAS.Jarat_szam WHERE
-                (UTAZAS.Szemelyi_szam = person_id) AND
+        try:
+            from_filter = request.form['from_filter']
+            to_filter = request.form['to_filter']
+            when_filter = request.form['when_filter']
+            owner_filter = request.form['owner_filter']
+            action = request.form['action']
+            email = session['email']
+            if action == 'Minden jarat':
+                cur.execute("SELECT * FROM JARAT")
+                trip_list = cur.fetchall()
+            elif action == 'Sajat utazasok':
+                output_cursor = cur.var(oracledb.DB_TYPE_CURSOR)
+                cur.execute("""
+                DECLARE
+                    person_id SZEMELY.Szemelyi_szam%TYPE;
+                    trip_cursor SYS_REFCURSOR;
+                BEGIN
+                    SELECT SZEMELYI_SZAM INTO person_id FROM SZEMELY WHERE EMAIL = :email;
+                    OPEN trip_cursor FOR
+                    SELECT *
+                    FROM JARAT
+                    JOIN UTAZAS ON JARAT.Jarat_szam = UTAZAS.Jarat_szam
+                    WHERE UTAZAS.Szemelyi_szam = person_id;
+                    :output_cursor := trip_cursor;
+                END;""", {'email': session['email'], 'output_cursor': output_cursor})
+                trip_list = output_cursor.getvalue().fetchall()
+            elif action == 'Szures' and owner_filter == 'any':
+                cur.execute("""
+                SELECT * FROM JARAT WHERE
                 (:from_filter = 'any' OR Honnan = :from_filter) AND
                 (:to_filter = 'any' OR Hova = :to_filter) AND
-                (:when_filter = 'any' OR Ido = TO_TIMESTAMP(:when_filter, 'YYYY-MM-DD HH24:MI:SS'));
-                :output_cursor := trip_cursor;
-            END;
-            """, from_filter=from_filter, to_filter=to_filter, when_filter=when_filter, email=email, output_cursor=output_cursor)
-            trip_list = output_cursor.getvalue().fetchall()
-        
+                (:when_filter = 'any' OR Ido = TO_TIMESTAMP(:when_filter, 'YYYY-MM-DD HH24:MI:SS')) 
+                """, from_filter=from_filter, to_filter=to_filter, when_filter=when_filter)
+                trip_list = cur.fetchall()
+            elif action == 'Szures' and owner_filter == 'relevant':
+                output_cursor = cur.var(oracledb.DB_TYPE_CURSOR)
+                cur.execute("""
+                DECLARE
+                    person_id SZEMELY.Szemelyi_szam%TYPE;
+                    trip_cursor SYS_REFCURSOR;
+                BEGIN
+                    SELECT SZEMELYI_SZAM INTO person_id FROM SZEMELY WHERE EMAIL = :email;
+                    OPEN trip_cursor FOR 
+                    SELECT * FROM JARAT 
+                    JOIN UTAZAS ON JARAT.Jarat_szam = UTAZAS.Jarat_szam WHERE
+                    (UTAZAS.Szemelyi_szam = person_id) AND
+                    (:from_filter = 'any' OR Honnan = :from_filter) AND
+                    (:to_filter = 'any' OR Hova = :to_filter) AND
+                    (:when_filter = 'any' OR Ido = TO_TIMESTAMP(:when_filter, 'YYYY-MM-DD HH24:MI:SS'));
+                    :output_cursor := trip_cursor;
+                END;
+                """, from_filter=from_filter, to_filter=to_filter, when_filter=when_filter, email=email, output_cursor=output_cursor)
+                trip_list = output_cursor.getvalue().fetchall()
+            elif action == 'Szures' and is_user_admin():
+                output_cursor = cur.var(oracledb.DB_TYPE_CURSOR)
+                cur.execute("""
+                DECLARE
+                    trip_cursor SYS_REFCURSOR;
+                BEGIN
+                    OPEN trip_cursor FOR 
+                    SELECT * FROM JARAT 
+                    JOIN UTAZAS ON JARAT.Jarat_szam = UTAZAS.Jarat_szam WHERE
+                    (UTAZAS.Szemelyi_szam = :person_id) AND
+                    (:from_filter = 'any' OR Honnan = :from_filter) AND
+                    (:to_filter = 'any' OR Hova = :to_filter) AND
+                    (:when_filter = 'any' OR Ido = TO_TIMESTAMP(:when_filter, 'YYYY-MM-DD HH24:MI:SS'));
+                    :output_cursor := trip_cursor;
+                END;
+                """, from_filter=from_filter, to_filter=to_filter, when_filter=when_filter, person_id=owner_filter, output_cursor=output_cursor)
+                trip_list = output_cursor.getvalue().fetchall()
+        except:
+            print('Valami probléma adódott.')
+            return redirect(url_for('plan_trip'))
     else:
         cur.execute("SELECT * FROM JARAT")
         trip_list = cur.fetchall()
@@ -151,8 +171,11 @@ def plan_trip():
     cities = cur.fetchall()    
     cur.execute("SELECT Ido FROM JARAT GROUP BY Ido")
     times = cur.fetchall()    
+    cur.execute("SELECT Nev, Szemelyi_szam FROM SZEMELY")
+    users = cur.fetchall()    
     cur.close()
-    return render_template('plan_trip.html', times=times, cities=cities, trip_list=trip_list, is_user_logged_in = is_user_logged_in(), active='plan_trip')
+    admin_privilege = is_user_admin()
+    return render_template('plan_trip.html', admin_privilege=admin_privilege, users=users, times=times, cities=cities, trip_list=trip_list, is_user_logged_in = is_user_logged_in(), active='plan_trip')
 
 @app.route('/reserve_trip/<id>')
 def reserve_trip(id):

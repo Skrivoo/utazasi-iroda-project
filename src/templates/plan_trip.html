@@ -19,6 +19,11 @@
           {% if is_user_logged_in %}
           <option value="relevant">Saját utazások</option>
           {% endif %}
+          {% if admin_privilege %}
+            {% for item in users %}
+            <option value="{{ item[1] }}">{{ item[0] }}</option>
+            {% endfor %}
+          {% endif %}
         </select>
         <label for="from_filter">Honnan:</label>
         <select class="form-control" name="from_filter" id="from_filter">
