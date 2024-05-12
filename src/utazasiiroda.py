@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, url_for, session, redirect
 from flask_bcrypt import Bcrypt
 import oracledb
 
+
 connection_string = "localhost:1521/freepdb1"
 con = oracledb.connect(
     user="SYSTEM", password='jelszo', dsn=connection_string
@@ -11,14 +12,29 @@ app = Flask(__name__)
 app.secret_key = 'nagyon titkos kod'
 bcrypt = Bcrypt(app)
 
+global user_email
+
+
+def user_point(useremail):
+    cur = con.cursor()
+    cur.execute("SELECT PONT FROM SZEMELY WHERE EMAIL = :user_email", user_email=useremail)
+    user_points = cur.fetchall()[0][0]
+    cur.close()
+    return user_points
+
+
 @app.route('/')
 @app.route('/home')
 def index():
+    user_points = None
+    user_email = 'admin'
     if is_user_logged_in():
         msg = 'Be vagy jelentkezve'
+        user_points = user_point(user_email)
+        render_template('index.html', connection=con.instance_name, user_points=user_points, msg=msg,  active='index')
     else:
         msg = 'Udvozlunk a repulogep szolgaltatonknal'
-    return render_template('index.html', connection=con.instance_name, msg=msg, active='index')
+    return render_template('index.html', connection=con.instance_name, user_points=user_points, msg=msg, active='index')
 
 
 @app.route('/registration', methods=['GET', 'POST'])
@@ -63,6 +79,7 @@ def login():
     elif request.method == 'POST' and \
             'password' in request.form and \
             'email' in request.form:
+        user_email = request.form['email']
         cur = con.cursor()
         sql = "SELECT PASSWD FROM SZEMELY WHERE EMAIL = :email"
         cur.execute(sql, email=request.form['email'])
@@ -142,7 +159,8 @@ def plan_trip():
                     (:when_filter = 'any' OR Ido = TO_TIMESTAMP(:when_filter, 'YYYY-MM-DD HH24:MI:SS'));
                     :output_cursor := trip_cursor;
                 END;
-                """, from_filter=from_filter, to_filter=to_filter, when_filter=when_filter, email=email, output_cursor=output_cursor)
+                """, from_filter=from_filter, to_filter=to_filter, when_filter=when_filter, email=email,
+                            output_cursor=output_cursor)
                 trip_list = output_cursor.getvalue().fetchall()
             elif action == 'Szures' and is_user_admin():
                 output_cursor = cur.var(oracledb.DB_TYPE_CURSOR)
@@ -159,7 +177,8 @@ def plan_trip():
                     (:when_filter = 'any' OR Ido = TO_TIMESTAMP(:when_filter, 'YYYY-MM-DD HH24:MI:SS'));
                     :output_cursor := trip_cursor;
                 END;
-                """, from_filter=from_filter, to_filter=to_filter, when_filter=when_filter, person_id=owner_filter, output_cursor=output_cursor)
+                """, from_filter=from_filter, to_filter=to_filter, when_filter=when_filter, person_id=owner_filter,
+                            output_cursor=output_cursor)
                 trip_list = output_cursor.getvalue().fetchall()
         except:
             print('Valami probléma adódott.')
@@ -168,14 +187,16 @@ def plan_trip():
         cur.execute("SELECT * FROM JARAT")
         trip_list = cur.fetchall()
     cur.execute("SELECT Neve, Kod FROM VAROS")
-    cities = cur.fetchall()    
+    cities = cur.fetchall()
     cur.execute("SELECT Ido FROM JARAT GROUP BY Ido")
-    times = cur.fetchall()    
+    times = cur.fetchall()
     cur.execute("SELECT Nev, Szemelyi_szam FROM SZEMELY")
-    users = cur.fetchall()    
+    users = cur.fetchall()
     cur.close()
     admin_privilege = is_user_admin()
-    return render_template('plan_trip.html', admin_privilege=admin_privilege, users=users, times=times, cities=cities, trip_list=trip_list, is_user_logged_in = is_user_logged_in(), active='plan_trip')
+    return render_template('plan_trip.html', admin_privilege=admin_privilege, users=users, times=times, cities=cities,
+                           trip_list=trip_list, is_user_logged_in=is_user_logged_in(), active='plan_trip')
+
 
 @app.route('/reserve_trip/<id>')
 def reserve_trip(id):
@@ -253,6 +274,7 @@ def insurance():
                         value_from=value_from,
                         value_to=value_to)
             insurance_list = cur.fetchall()
+
         else:
             cur.execute("""
                         SELECT * FROM BIZTOSITAS 
@@ -266,7 +288,7 @@ def insurance():
                         value_from=value_from,
                         value_to=value_to)
             insurance_list = cur.fetchall()
-        
+
         cur.close()
     else:
         cur = con.cursor()
@@ -283,11 +305,12 @@ def insurance():
         'insurance.html',
         types=type_list,
         insurance=insurance_list,
-        is_user_logged_in = is_user_logged_in(),
-        admin_privilege = admin_privilege,
+        is_user_logged_in=is_user_logged_in(),
+        admin_privilege=admin_privilege,
         msg=msg,
         active='insurance'
     )
+
 
 @app.route('/insurance/<id>/delete')
 def delete_insurance(id):
@@ -312,7 +335,8 @@ def accommodations():
         try:
             cur = con.cursor()
             cur.execute("INSERT INTO SZALLAS VALUES (:1, :2, :3, :4, :5)",
-                        (request.form['id'], request.form['name'], request.form['price'], request.form['address'], request.form['city']))
+                        (request.form['id'], request.form['name'], request.form['price'], request.form['address'],
+                         request.form['city']))
             con.commit()
             msg = 'A szallas sikeresen hozzaadva'
         except:
@@ -355,8 +379,8 @@ def accommodations():
                     )
                     SELECT * FROM SZALLAS WHERE Varos_Kod IN (SELECT Varos_Kod FROM cities);
                     :output_cursor := hotel_cursor;
-                END;""", 
-                email=session['email'], output_cursor=output_cursor)
+                END;""",
+                        email=session['email'], output_cursor=output_cursor)
             accommodation_list = output_cursor.getvalue().fetchall()
         elif city_filter == 'relevant':
             output_cursor = cur.var(oracledb.DB_TYPE_CURSOR)
@@ -388,19 +412,22 @@ def accommodations():
                     WHERE (CAST(:cost_from AS NUMERIC) <= Ar) AND (Ar <= CAST(:cost_to AS NUMERIC));
                         
                     :output_cursor := hotel_cursor;
-                END;""", 
-                email=session['email'], 
-                cost_from=str(cost_from), 
-                cost_to=str(cost_to),
-                output_cursor=output_cursor, 
-                )
+                END;""",
+                        email=session['email'],
+                        cost_from=str(cost_from),
+                        cost_to=str(cost_to),
+                        output_cursor=output_cursor,
+                        )
             accommodation_list = output_cursor.getvalue().fetchall()
         elif city_filter == 'any':
-            cur.execute("SELECT * FROM SZALLAS WHERE (:cost_from <= Ar) AND (Ar <= :cost_to)", cost_from=cost_from, cost_to=cost_to)
+            cur.execute("SELECT * FROM SZALLAS WHERE (:cost_from <= Ar) AND (Ar <= :cost_to)", cost_from=cost_from,
+                        cost_to=cost_to)
             accommodation_list = cur.fetchall()
         else:
             try:
-                cur.execute("SELECT * FROM SZALLAS WHERE (Varos_Kod = :city_code) AND  (:cost_from <= Ar) AND (Ar <= :cost_to)", city_code=filter, cost_from=cost_from, cost_to=cost_to)
+                cur.execute(
+                    "SELECT * FROM SZALLAS WHERE (Varos_Kod = :city_code) AND  (:cost_from <= Ar) AND (Ar <= :cost_to)",
+                    city_code=filter, cost_from=cost_from, cost_to=cost_to)
                 accommodation_list = cur.fetchall()
             except:
                 cur.close()
@@ -413,7 +440,7 @@ def accommodations():
         cur.close()
     cur = con.cursor()
     cur.execute("SELECT Neve, Kod FROM VAROS")
-    cities = cur.fetchall()        
+    cities = cur.fetchall()
     cur.close()
     admin_privilege = is_user_admin()
     return render_template(
@@ -435,6 +462,7 @@ def delete_accommodation(id):
     con.commit()
     cur.close()
     return redirect(url_for('accommodations'))
+
 
 # ADMIN BEJELENTKEZÉS: sima bejelentkezés email:admin password:admin, majd /admin megnyitása
 @app.route('/admin', methods=['GET', 'POST'])
@@ -470,13 +498,68 @@ def manage_user():
             else:
                 cur = con.cursor()
                 sql = "UPDATE SZEMELY SET SZEMELYI_SZAM = :id_number, NEV = :name WHERE EMAIL = :email"
-                cur.execute(sql, id_number=request.form['id-number'], name=request.form['name'], email=request.form['email'])
+                cur.execute(sql, id_number=request.form['id-number'], name=request.form['name'],
+                            email=request.form['email'])
                 con.commit()
                 msg = 'A felhasznalo sikeresen frissitve'
     return render_template('manage_user.html', msg=msg, active='manage_user')
 
+
+@app.route('/manage_flights', methods=['GET', 'POST'])
+def manage_flights():
+    msg = ''
+    msg2 = ''
+    admin_privilege = None
+    cur = con.cursor()
+    cur.execute("SELECT * FROM UTAZAS")
+    flights_list = cur.fetchall()
+    if request.method == 'POST' and \
+            'flight_number' in request.form and \
+            'old_flight_number' in request.form and \
+            'action' in request.form:
+        if request.form['action'] == 'Fríssités':
+            if ('flight_number' not in request.form or 'id-number' not in request.form or
+                    'old_flight_number' not in request.form):
+                msg = 'Az szemelyi azonosito es a járat számok megadasa is szukseges'
+                render_template('manage_flights.html', msg=msg, active='manage_flights')
+            else:
+                cur = con.cursor()
+                sql = """UPDATE UTAZAS 
+                     SET JARAT_SZAM = :flight_number 
+                     WHERE SZEMELYI_SZAM = :id_number AND JARAT_SZAM = :old_flight_number"""
+                cur.execute(sql, id_number=request.form['id-number'], flight_number=request.form['flight_number'],
+                            old_flight_number=request.form['old_flight_number'])
+                con.commit()
+                cur = con.cursor()
+                cur.execute("SELECT * FROM UTAZAS")
+                flights_list = cur.fetchall()
+                msg = 'A járat sikeresen frissitve'
+                render_template('manage_flights.html', msg=msg, flights=flights_list, active='manage_flights')
+        if request.form['action'] == 'Törlés':
+            if 'flight_number' not in request.form or 'id-number' not in request.form:
+                msg = 'Az szemelyi azonosito es a járat szám megadasa is szukseges'
+                render_template('manage_flights.html', msg=msg, active='manage_flights')
+            else:
+                cur = con.cursor()
+                sql = """DELETE FROM UTAZAS 
+                                     WHERE SZEMELYI_SZAM = :id_number AND JARAT_SZAM = :flight_number"""
+                cur.execute(sql, id_number=request.form['id-number'], flight_number=request.form['flight_number'])
+                con.commit()
+                cur.close()
+                cur = con.cursor()
+                cur.execute("SELECT * FROM UTAZAS")
+                flights_list = cur.fetchall()
+                cur.close()
+                msg = 'A járat sikeresen törölve'
+                render_template('manage_flights.html', msg=msg, flights=flights_list, active='manage_flights')
+    admin_privilege = is_user_admin()
+    return render_template('manage_flights.html', msg=msg, msg2=msg2, flights=flights_list,
+                           active='manage_flights')
+
+
 def is_user_logged_in():
     return True if 'loggedin' in session else False
+
 
 def is_user_admin():
     return True if 'admin' in session else False

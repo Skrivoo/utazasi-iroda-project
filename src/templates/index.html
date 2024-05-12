@@ -11,8 +11,31 @@
   <body>
     {% include 'navigation.html' %}
     <h1>Connected to: {{ connection }}</h1>
-
     <h2>{{ msg }}</h2>
+    {% if user_points != None %}
+    <h3>{{ user_points }}</h3>
+    <h3>Pontok beváltása kuponokra lehet</h3>
+    <table class="table table-bordered table-striped">
+        <tr>
+            <td>10% kedvezmény 1000 pont</td>
+            <td><a class="btn btn-primary" role="button">Bevált</a></td>
+        <tr>
+           <td>20% kedvezmény 3000 pont</td>
+        <td><a class="btn btn-primary" role="button">Bevált</a></td>
+        </tr>
+        <tr>
+            <td>30% kedvezmény 5000 pont</td>
+            <td><a class="btn btn-primary" role="button">Bevált</a></td>
+        </tr>
+        <tr>
+            <td>40% kedvezmény 10000 pont</td>
+            <td><a class="btn btn-primary" role="button">Bevált</a></td>
+        </tr>
+
+        </tr>
+    </table>
+     <h4>Az email címedre küldjük a cupont amit személyesen tudsz beváltani majd.</h4>
+    {%endif%}
 
   </body>
 </html>

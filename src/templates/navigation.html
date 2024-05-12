@@ -12,6 +12,9 @@
         <li {% if active == 'insurance' %} class="active" {% endif %}><a href="/insurance">Biztositas</a></li>
         <li {% if active == 'plan_trip' %} class="active" {% endif %}><a href="/plan_trip">Utazas keresese</a></li>
         <li {% if active == 'accommodations' %} class="active" {% endif %}><a href="/accommodations">Szallasok</a></li>
+        {% if admin_privilege %}
+        <li {% if active == 'manage_flights' %} class="active" {% endif %}><a href="/manage_flights">Járatok kezelése</a></li>
+        {% endif %}
       </ul>
     </div>
 </nav>
