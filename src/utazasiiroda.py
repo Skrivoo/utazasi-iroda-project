@@ -12,26 +12,14 @@ app = Flask(__name__)
 app.secret_key = 'nagyon titkos kod'
 bcrypt = Bcrypt(app)
 
-global user_email
-
-
-def user_point(useremail):
-    cur = con.cursor()
-    cur.execute("SELECT PONT FROM SZEMELY WHERE EMAIL = :user_email", user_email=useremail)
-    user_points = cur.fetchall()[0][0]
-    cur.close()
-    return user_points
-
 
 @app.route('/')
 @app.route('/home')
 def index():
     user_points = None
-    user_email = 'admin'
     if is_user_logged_in():
         msg = 'Be vagy jelentkezve'
-        user_points = user_point(user_email)
-        render_template('index.html', connection=con.instance_name, user_points=user_points, msg=msg,  active='index')
+        user_points = get_user_points()
     else:
         msg = 'Udvozlunk a repulogep szolgaltatonknal'
     return render_template('index.html', connection=con.instance_name, user_points=user_points, msg=msg, active='index')
@@ -555,6 +543,14 @@ def manage_flights():
     admin_privilege = is_user_admin()
     return render_template('manage_flights.html', msg=msg, msg2=msg2, flights=flights_list,
                            active='manage_flights')
+
+
+def get_user_points():
+    cur = con.cursor()
+    cur.execute("SELECT PONT FROM SZEMELY WHERE EMAIL = :user_email", user_email=session['email'])
+    user_points = cur.fetchall()[0][0]
+    cur.close()
+    return user_points
 
 
 def is_user_logged_in():
