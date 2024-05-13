@@ -22,7 +22,7 @@ def index():
         user_points = get_user_points()
     else:
         msg = 'Udvozlunk a repulogep szolgaltatonknal'
-    return render_template('index.html', connection=con.instance_name, user_points=user_points, msg=msg, active='index')
+    return render_template('index.html', connection=con.instance_name, user_points=user_points, msg=msg, active='index', admin_privilege=is_user_admin())
 
 
 @app.route('/registration', methods=['GET', 'POST'])
@@ -41,7 +41,6 @@ def registration():
         password_again = request.form['password-again']
         id_number = request.form['id-number']
         birthdate = request.form['birthdate']
-        admin = 0
         if password != password_again:
             msg = 'A ket jelszo nem egyezik meg!'
         else:
@@ -49,14 +48,14 @@ def registration():
             try:
                 cur = con.cursor()
                 cur.execute("INSERT INTO SZEMELY VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'), :4, :5, :6)",
-                            (id_number, name, birthdate, email, hashed_password, admin))
+                            (id_number, name, birthdate, email, hashed_password, 0))
                 con.commit()
             except Exception as e:
                 print(e)
                 msg = 'A regisztracio sikertelen :('
     elif request.method == 'POST':
         msg = 'Tolts ki minden mezot!'
-    return render_template('registration.html', msg=msg, active='registration')
+    return render_template('registration.html', msg=msg, active='registration', admin_privilege=is_user_admin())
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -67,21 +66,24 @@ def login():
     elif request.method == 'POST' and \
             'password' in request.form and \
             'email' in request.form:
-        user_email = request.form['email']
         cur = con.cursor()
-        sql = "SELECT PASSWD FROM SZEMELY WHERE EMAIL = :email"
+        sql = "SELECT PASSWD, IS_ADMIN FROM SZEMELY WHERE EMAIL = :email"
         cur.execute(sql, email=request.form['email'])
-        hashed_password = cur.fetchone()[0]
+        result = cur.fetchone()
+        hashed_password = result[0]
+        is_admin = bool(result[1])
         cur.close()
         is_valid = bcrypt.check_password_hash(hashed_password, request.form['password'])
         if is_valid:
             session['loggedin'] = True
             session['email'] = request.form['email']
+            if is_admin:
+                session['admin'] = True
             msg = 'Sikeres bejelentkezes!'
             return render_template('index.html', msg=msg)
         else:
             msg = 'Sikertelen bejelentkezes, nem megfelelo email vagy jelszo!'
-    return render_template('login.html', msg=msg, active='login')
+    return render_template('login.html', msg=msg, active='login', admin_privilege=is_user_admin())
 
 
 @app.route('/logout')
@@ -181,16 +183,15 @@ def plan_trip():
     cur.execute("SELECT Nev, Szemelyi_szam FROM SZEMELY")
     users = cur.fetchall()
     cur.close()
-    admin_privilege = is_user_admin()
-    return render_template('plan_trip.html', admin_privilege=admin_privilege, users=users, times=times, cities=cities,
+    return render_template('plan_trip.html', admin_privilege=is_user_admin(), users=users, times=times, cities=cities,
                            trip_list=trip_list, is_user_logged_in=is_user_logged_in(), active='plan_trip')
 
 
 @app.route('/reserve_trip/<id>')
 def reserve_trip(id):
     msg = ''
+    cur = con.cursor()
     try:
-        cur = con.cursor()
         output = cur.var(int)
         cur.execute("""
                 declare
@@ -219,7 +220,8 @@ def reserve_trip(id):
             msg = f'Sikeres foglalas, a {id} azonositoju jaraton az On ulesszama: {output.getvalue()}'
     except oracledb.IntegrityError:
         msg = 'Mar foglalt erre az utra'
-    cur.close()
+    finally:
+        cur.close()
     return render_template('index.html', msg=msg, active='index')
 
 
@@ -284,7 +286,6 @@ def insurance():
         insurance_list = cur.fetchall()
         cur.close()
 
-    admin_privilege = is_user_admin()
     cur = con.cursor()
     cur.execute("SELECT Tipus FROM BIZTOSITAS GROUP BY Tipus")
     type_list = cur.fetchall()
@@ -294,7 +295,7 @@ def insurance():
         types=type_list,
         insurance=insurance_list,
         is_user_logged_in=is_user_logged_in(),
-        admin_privilege=admin_privilege,
+        admin_privilege=is_user_admin(),
         msg=msg,
         active='insurance'
     )
@@ -430,13 +431,12 @@ def accommodations():
     cur.execute("SELECT Neve, Kod FROM VAROS")
     cities = cur.fetchall()
     cur.close()
-    admin_privilege = is_user_admin()
     return render_template(
         'accommodations.html',
         cities=cities,
         accommodations=accommodation_list,
         is_user_logged_in=is_user_logged_in(),
-        admin_privilege=admin_privilege,
+        admin_privilege=is_user_admin(),
         msg=msg,
         active='accommodations'
     )
@@ -490,14 +490,12 @@ def manage_user():
                             email=request.form['email'])
                 con.commit()
                 msg = 'A felhasznalo sikeresen frissitve'
-    return render_template('manage_user.html', msg=msg, active='manage_user')
+    return render_template('manage_user.html', msg=msg, active='manage_user', admin_privilege=is_user_admin())
 
 
 @app.route('/manage_flights', methods=['GET', 'POST'])
 def manage_flights():
     msg = ''
-    msg2 = ''
-    admin_privilege = None
     cur = con.cursor()
     cur.execute("SELECT * FROM UTAZAS")
     flights_list = cur.fetchall()
@@ -509,7 +507,6 @@ def manage_flights():
             if ('flight_number' not in request.form or 'id-number' not in request.form or
                     'old_flight_number' not in request.form):
                 msg = 'Az szemelyi azonosito es a járat számok megadasa is szukseges'
-                render_template('manage_flights.html', msg=msg, active='manage_flights')
             else:
                 cur = con.cursor()
                 sql = """UPDATE UTAZAS 
@@ -522,11 +519,9 @@ def manage_flights():
                 cur.execute("SELECT * FROM UTAZAS")
                 flights_list = cur.fetchall()
                 msg = 'A járat sikeresen frissitve'
-                render_template('manage_flights.html', msg=msg, flights=flights_list, active='manage_flights')
         if request.form['action'] == 'Törlés':
             if 'flight_number' not in request.form or 'id-number' not in request.form:
                 msg = 'Az szemelyi azonosito es a járat szám megadasa is szukseges'
-                render_template('manage_flights.html', msg=msg, active='manage_flights')
             else:
                 cur = con.cursor()
                 sql = """DELETE FROM UTAZAS 
@@ -539,16 +534,19 @@ def manage_flights():
                 flights_list = cur.fetchall()
                 cur.close()
                 msg = 'A járat sikeresen törölve'
-                render_template('manage_flights.html', msg=msg, flights=flights_list, active='manage_flights')
-    admin_privilege = is_user_admin()
-    return render_template('manage_flights.html', msg=msg, msg2=msg2, flights=flights_list,
-                           active='manage_flights')
+    return render_template(
+        'manage_flights.html',
+        msg=msg,
+        flights=flights_list,
+        active='manage_flights',
+        admin_privilege=is_user_admin()
+    )
 
 
 def get_user_points():
     cur = con.cursor()
     cur.execute("SELECT PONT FROM SZEMELY WHERE EMAIL = :user_email", user_email=session['email'])
-    user_points = cur.fetchall()[0][0]
+    user_points = cur.fetchone()[0]
     cur.close()
     return user_points
 
